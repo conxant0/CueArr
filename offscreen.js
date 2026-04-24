@@ -96,7 +96,7 @@ function scanAll(ctx, width, height, dpr) {
 async function decodeAllQRCodes(imageDataUrl) {
   const dpr = window.devicePixelRatio || 1;
   const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const img = new Image();
 
   await new Promise((resolve) => {

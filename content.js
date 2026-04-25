@@ -53,11 +53,51 @@ function createOverlay(result) {
     a.addEventListener('click', () => div.remove());
     div.appendChild(a);
   } else {
-    const span = document.createElement('span');
-    span.className = 'qrls-text';
-    span.textContent = result.data;
-    span.style.cssText = 'display:block;color:#333;margin-bottom:6px;padding-right:16px;';
-    div.appendChild(span);
+    if (result.data.length > 35) {
+      const truncatedSpan = document.createElement('span');
+      truncatedSpan.className = 'qrls-text-truncated';
+      truncatedSpan.textContent = result.data.slice(0, 35) + '…';
+      truncatedSpan.style.cssText = 'display:block;color:#333;margin-bottom:6px;padding-right:16px;';
+      div.appendChild(truncatedSpan);
+
+      const fullSpan = document.createElement('span');
+      fullSpan.className = 'qrls-text-full';
+      fullSpan.textContent = result.data;
+      fullSpan.style.cssText = 'display:none;color:#333;margin-bottom:6px;padding-right:16px;';
+      div.appendChild(fullSpan);
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'qrls-toggle-btn';
+      toggleBtn.textContent = 'Show more';
+      toggleBtn.style.cssText = [
+        'background:#f1f3f4',
+        'color:#333',
+        'border:none',
+        'border-radius:4px',
+        'padding:3px 10px',
+        'cursor:pointer',
+        'font-size:12px',
+        'margin-right:6px'
+      ].join(';');
+      toggleBtn.addEventListener('click', () => {
+        if (toggleBtn.textContent === 'Show more') {
+          truncatedSpan.style.display = 'none';
+          fullSpan.style.display = 'block';
+          toggleBtn.textContent = 'Show less';
+        } else {
+          truncatedSpan.style.display = 'block';
+          fullSpan.style.display = 'none';
+          toggleBtn.textContent = 'Show more';
+        }
+      });
+      div.appendChild(toggleBtn);
+    } else {
+      const span = document.createElement('span');
+      span.className = 'qrls-text';
+      span.textContent = result.data;
+      span.style.cssText = 'display:block;color:#333;margin-bottom:6px;padding-right:16px;';
+      div.appendChild(span);
+    }
 
     const copyBtn = document.createElement('button');
     copyBtn.className = 'qrls-copy-btn';

@@ -59,3 +59,62 @@ describe('createToast', () => {
     expect(toast.textContent).toContain('No QR codes found');
   });
 });
+
+describe('createOverlay — show-more', () => {
+  const shortText = 'a'.repeat(100);
+  const longText  = 'a'.repeat(101);
+
+  test('text exactly 100 chars renders full text, no toggle button', () => {
+    const el = createOverlay({ data: shortText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
+    expect(el.querySelector('.qrls-toggle-btn')).toBeNull();
+    expect(el.querySelector('.qrls-text').textContent).toBe(shortText);
+  });
+
+  test('text 101 chars renders truncated span, full span, and toggle button', () => {
+    const el = createOverlay({ data: longText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
+    expect(el.querySelector('.qrls-text-truncated')).not.toBeNull();
+    expect(el.querySelector('.qrls-text-full')).not.toBeNull();
+    expect(el.querySelector('.qrls-toggle-btn')).not.toBeNull();
+  });
+
+  test('default state: truncated span visible, full span hidden, button says "Show more"', () => {
+    const el = createOverlay({ data: longText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
+    expect(el.querySelector('.qrls-text-truncated').style.display).toBe('block');
+    expect(el.querySelector('.qrls-text-full').style.display).toBe('none');
+    expect(el.querySelector('.qrls-toggle-btn').textContent).toBe('Show more');
+  });
+
+  test('truncated span shows first 100 chars followed by ellipsis character', () => {
+    const el = createOverlay({ data: longText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
+    expect(el.querySelector('.qrls-text-truncated').textContent).toBe(longText.slice(0, 100) + '…');
+  });
+
+  test('clicking toggle once shows full span and relabels button "Show less"', () => {
+    const el = createOverlay({ data: longText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
+    el.querySelector('.qrls-toggle-btn').click();
+    expect(el.querySelector('.qrls-text-truncated').style.display).toBe('none');
+    expect(el.querySelector('.qrls-text-full').style.display).toBe('block');
+    expect(el.querySelector('.qrls-toggle-btn').textContent).toBe('Show less');
+  });
+
+  test('clicking toggle twice collapses back to truncated, button says "Show more"', () => {
+    const el = createOverlay({ data: longText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
+    el.querySelector('.qrls-toggle-btn').click();
+    el.querySelector('.qrls-toggle-btn').click();
+    expect(el.querySelector('.qrls-text-truncated').style.display).toBe('block');
+    expect(el.querySelector('.qrls-text-full').style.display).toBe('none');
+    expect(el.querySelector('.qrls-toggle-btn').textContent).toBe('Show more');
+  });
+
+  test('full span always contains the complete untruncated text', () => {
+    const el = createOverlay({ data: longText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
+    expect(el.querySelector('.qrls-text-full').textContent).toBe(longText);
+  });
+
+  test('copy button is present for long text regardless of toggle state', () => {
+    const el = createOverlay({ data: longText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
+    expect(el.querySelector('.qrls-copy-btn')).not.toBeNull();
+    el.querySelector('.qrls-toggle-btn').click();
+    expect(el.querySelector('.qrls-copy-btn')).not.toBeNull();
+  });
+});

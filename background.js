@@ -12,6 +12,10 @@ async function ensureOffscreenDocument() {
 }
 
 async function handleTrigger(tab) {
+  if (tab.url && (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://'))) {
+    return;
+  }
+
   // Round-trip to content.js: remove overlays if any exist, otherwise proceed
   let toggleResponse;
   try {

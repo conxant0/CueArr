@@ -74,6 +74,9 @@ function createOverlay(result) {
       navigator.clipboard.writeText(result.data).then(() => {
         copyBtn.textContent = 'Copied!';
         setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+      }).catch(() => {
+        copyBtn.textContent = 'Failed';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
       });
     });
     div.appendChild(copyBtn);

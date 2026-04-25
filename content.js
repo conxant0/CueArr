@@ -50,6 +50,7 @@ function createOverlay(result) {
     a.setAttribute('rel', 'noopener noreferrer');
     a.textContent = result.data;
     a.style.cssText = 'color:#1a73e8;text-decoration:underline;display:block;padding-right:16px;';
+    a.addEventListener('click', () => div.remove());
     div.appendChild(a);
   } else {
     const span = document.createElement('span');

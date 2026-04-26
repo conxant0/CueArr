@@ -1,6 +1,6 @@
 global.chrome = { runtime: { onMessage: { addListener: jest.fn() } } };
 
-const { isUrl, createOverlay, createToast } = require('../content');
+const { isUrl, createOverlay, createToast, createBackdrop, showBackdrop, syncBackdrop } = require('../content');
 
 describe('isUrl', () => {
   test('returns true for http URL', () => {
@@ -61,8 +61,8 @@ describe('createToast', () => {
 });
 
 describe('createOverlay — show-more', () => {
-  const shortText = 'a'.repeat(100);
-  const longText  = 'a'.repeat(101);
+  const shortText = 'a'.repeat(34);
+  const longText  = 'a'.repeat(36);
 
   test('text exactly 100 chars renders full text, no toggle button', () => {
     const el = createOverlay({ data: shortText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
@@ -84,9 +84,9 @@ describe('createOverlay — show-more', () => {
     expect(el.querySelector('.qrls-toggle-btn').textContent).toBe('Show more');
   });
 
-  test('truncated span shows first 100 chars followed by ellipsis character', () => {
+  test('truncated span shows first 34 chars followed by ellipsis character', () => {
     const el = createOverlay({ data: longText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
-    expect(el.querySelector('.qrls-text-truncated').textContent).toBe(longText.slice(0, 100) + '…');
+    expect(el.querySelector('.qrls-text-truncated').textContent).toBe(longText.slice(0, 35) + '…');
   });
 
   test('clicking toggle once shows full span and relabels button "Show less"', () => {
@@ -116,5 +116,186 @@ describe('createOverlay — show-more', () => {
     expect(el.querySelector('.qrls-copy-btn')).not.toBeNull();
     el.querySelector('.qrls-toggle-btn').click();
     expect(el.querySelector('.qrls-copy-btn')).not.toBeNull();
+  });
+});
+
+describe('createBackdrop', () => {
+  test('has class qrls-backdrop', () => {
+    const el = createBackdrop();
+    expect(el.classList.contains('qrls-backdrop')).toBe(true);
+  });
+
+  test('is position fixed', () => {
+    const el = createBackdrop();
+    expect(el.style.position).toBe('fixed');
+  });
+
+  test('has z-index 2147483646', () => {
+    const el = createBackdrop();
+    expect(el.style.zIndex).toBe('2147483646');
+  });
+
+  test('starts with opacity 0', () => {
+    const el = createBackdrop();
+    expect(el.style.opacity).toBe('0');
+  });
+
+  test('has semi-transparent dark background', () => {
+    const el = createBackdrop();
+    expect(el.style.background).toContain('rgba');
+  });
+});
+
+describe('showBackdrop / syncBackdrop', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.body.style.overflow = '';
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test('showBackdrop appends a .qrls-backdrop to body', () => {
+    showBackdrop();
+    expect(document.querySelector('.qrls-backdrop')).not.toBeNull();
+  });
+
+  test('showBackdrop sets body overflow to hidden', () => {
+    showBackdrop();
+    expect(document.body.style.overflow).toBe('hidden');
+  });
+
+  test('showBackdrop does not add a second backdrop if one already exists', () => {
+    showBackdrop();
+    showBackdrop();
+    expect(document.querySelectorAll('.qrls-backdrop').length).toBe(1);
+  });
+
+  test('syncBackdrop removes the backdrop when no overlays remain', () => {
+    showBackdrop();
+    syncBackdrop();
+    jest.advanceTimersByTime(200);
+    expect(document.querySelector('.qrls-backdrop')).toBeNull();
+  });
+
+  test('syncBackdrop restores body overflow when backdrop is removed', () => {
+    document.body.style.overflow = 'auto';
+    showBackdrop();
+    syncBackdrop();
+    expect(document.body.style.overflow).toBe('auto');
+  });
+
+  test('syncBackdrop keeps backdrop when overlays still exist', () => {
+    showBackdrop();
+    const overlay = document.createElement('div');
+    overlay.className = 'qrls-overlay';
+    document.body.appendChild(overlay);
+    syncBackdrop();
+    jest.advanceTimersByTime(200);
+    expect(document.querySelector('.qrls-backdrop')).not.toBeNull();
+  });
+
+  test('syncBackdrop does nothing when no backdrop exists', () => {
+    expect(() => syncBackdrop()).not.toThrow();
+  });
+});
+
+describe('backdrop integration', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.body.style.overflow = '';
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test('clicking × on the only overlay removes the backdrop', () => {
+    const overlay = createOverlay(
+      { data: 'hello', topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 },
+      syncBackdrop
+    );
+    document.body.appendChild(overlay);
+    showBackdrop();
+
+    overlay.querySelector('.qrls-close').click();
+    jest.advanceTimersByTime(200);
+
+    expect(document.querySelector('.qrls-backdrop')).toBeNull();
+  });
+
+  test('clicking × when another overlay remains keeps the backdrop', () => {
+    const overlay1 = createOverlay(
+      { data: 'hello', topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 },
+      syncBackdrop
+    );
+    const overlay2 = createOverlay(
+      { data: 'world', topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 },
+      syncBackdrop
+    );
+    document.body.appendChild(overlay1);
+    document.body.appendChild(overlay2);
+    showBackdrop();
+
+    overlay1.querySelector('.qrls-close').click();
+    jest.advanceTimersByTime(200);
+
+    expect(document.querySelector('.qrls-backdrop')).not.toBeNull();
+  });
+
+  test('clicking a link on the only overlay removes the backdrop', () => {
+    const overlay = createOverlay(
+      { data: 'https://example.com', topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 },
+      syncBackdrop
+    );
+    document.body.appendChild(overlay);
+    showBackdrop();
+
+    overlay.querySelector('a.qrls-link').click();
+    jest.advanceTimersByTime(200);
+
+    expect(document.querySelector('.qrls-backdrop')).toBeNull();
+  });
+
+  test('clicking a link when another overlay remains keeps the backdrop', () => {
+    const overlay1 = createOverlay(
+      { data: 'https://example.com', topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 },
+      syncBackdrop
+    );
+    const overlay2 = createOverlay(
+      { data: 'world', topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 },
+      syncBackdrop
+    );
+    document.body.appendChild(overlay1);
+    document.body.appendChild(overlay2);
+    showBackdrop();
+
+    overlay1.querySelector('a.qrls-link').click();
+    jest.advanceTimersByTime(200);
+
+    expect(document.querySelector('.qrls-backdrop')).not.toBeNull();
+  });
+
+  test('clicking the backdrop removes all overlays and itself', () => {
+    const overlay1 = createOverlay(
+      { data: 'hello', topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 },
+      syncBackdrop
+    );
+    const overlay2 = createOverlay(
+      { data: 'world', topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 },
+      syncBackdrop
+    );
+    document.body.appendChild(overlay1);
+    document.body.appendChild(overlay2);
+    showBackdrop();
+
+    document.querySelector('.qrls-backdrop').click();
+    jest.advanceTimersByTime(200);
+
+    expect(document.querySelectorAll('.qrls-overlay').length).toBe(0);
+    expect(document.querySelector('.qrls-backdrop')).toBeNull();
   });
 });

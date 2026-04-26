@@ -2,7 +2,7 @@ function isUrl(str) {
   return /^https?:\/\//i.test(str);
 }
 
-function createOverlay(result) {
+function createOverlay(result, onClose = () => {}) {
   const cssX = result.topLeftX / result.devicePixelRatio;
   const cssY = result.topLeftY / result.devicePixelRatio;
 
@@ -39,7 +39,7 @@ function createOverlay(result) {
     'line-height:1',
     'padding:0'
   ].join(';');
-  closeBtn.addEventListener('click', () => div.remove());
+  closeBtn.addEventListener('click', () => { div.remove(); onClose(); });
   div.appendChild(closeBtn);
 
   if (isUrl(result.data)) {
@@ -50,7 +50,7 @@ function createOverlay(result) {
     a.setAttribute('rel', 'noopener noreferrer');
     a.textContent = result.data;
     a.style.cssText = 'color:#1a73e8;text-decoration:underline;display:block;padding-right:16px;';
-    a.addEventListener('click', () => div.remove());
+    a.addEventListener('click', () => { div.remove(); onClose(); });
     div.appendChild(a);
   } else {
     if (result.data.length > 35) {
@@ -126,6 +126,45 @@ function createOverlay(result) {
   return div;
 }
 
+function createBackdrop() {
+  const div = document.createElement('div');
+  div.className = 'qrls-backdrop';
+  div.style.cssText = [
+    'position:fixed',
+    'inset:0',
+    'background:rgba(0,0,0,0.45)',
+    'z-index:2147483646',
+    'opacity:0',
+    'transition:opacity 0.2s ease'
+  ].join(';');
+  div.addEventListener('click', () => {
+    removeOverlays();
+    syncBackdrop();
+  });
+  return div;
+}
+
+let _savedOverflow = null;
+
+function showBackdrop() {
+  if (document.querySelector('.qrls-backdrop')) return;
+  _savedOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  const backdrop = createBackdrop();
+  document.body.appendChild(backdrop);
+  requestAnimationFrame(() => { backdrop.style.opacity = '1'; });
+}
+
+function syncBackdrop() {
+  if (document.querySelectorAll('.qrls-overlay').length > 0) return;
+  const backdrop = document.querySelector('.qrls-backdrop');
+  if (!backdrop) return;
+  backdrop.style.opacity = '0';
+  document.body.style.overflow = _savedOverflow || '';
+  _savedOverflow = null;
+  setTimeout(() => backdrop.remove(), 200);
+}
+
 function createToast() {
   const div = document.createElement('div');
   div.className = 'qrls-toast';
@@ -162,8 +201,9 @@ function showToast() {
 }
 
 function injectOverlays(results) {
+  showBackdrop();
   results.forEach(result => {
-    document.body.appendChild(createOverlay(result));
+    document.body.appendChild(createOverlay(result, syncBackdrop));
   });
 }
 
@@ -172,6 +212,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const overlays = document.querySelectorAll('.qrls-overlay');
     if (overlays.length > 0) {
       removeOverlays();
+      syncBackdrop();
       sendResponse({ toggled: true });
     } else {
       sendResponse({ toggled: false });
@@ -192,5 +233,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 if (typeof module !== 'undefined') {
-  module.exports = { isUrl, createOverlay, createToast };
+  module.exports = { isUrl, createOverlay, createToast, createBackdrop, showBackdrop, syncBackdrop };
 }

@@ -66,7 +66,14 @@ async function handleTrigger(tab) {
   }
 
   await ensureOffscreenDocument();
-  const results = await chrome.runtime.sendMessage({ type: 'DECODE_QR', imageDataUrl });
+  let results;
+  try {
+    results = await chrome.runtime.sendMessage({ type: 'DECODE_QR', imageDataUrl });
+  } catch (err) {
+    console.error('Failed to decode QR via offscreen document:', err);
+    chrome.tabs.sendMessage(tab.id, { type: 'SHOW_RESULTS', results: [] });
+    return;
+  }
 
   try {
     await chrome.tabs.sendMessage(tab.id, { type: 'SHOW_RESULTS', results: results || [] });

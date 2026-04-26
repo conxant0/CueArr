@@ -1,5 +1,6 @@
 const BLOCK_SIZE_DENOMINATOR = 48;
 const ADAPTIVE_THRESHOLD_SENSITIVITY = 0.88;
+const DOWNSAMPLE_PIXEL_THRESHOLD = 2_000_000;
 
 function extractResult(code, dpr) {
   return {
@@ -111,18 +112,31 @@ async function decodeAllQRCodes(imageDataUrl) {
   canvas.width = img.width;
   canvas.height = img.height;
 
+  let scanCtx = ctx;
+  let scanWidth = canvas.width;
+  let scanHeight = canvas.height;
+
+  if (canvas.width * canvas.height > DOWNSAMPLE_PIXEL_THRESHOLD) {
+    const secondary = document.createElement('canvas');
+    secondary.width = Math.round(canvas.width / dpr);
+    secondary.height = Math.round(canvas.height / dpr);
+    scanCtx = secondary.getContext('2d', { willReadFrequently: true });
+    scanWidth = secondary.width;
+    scanHeight = secondary.height;
+  }
+
   // Pass 1: try jsQR on the original screenshot.
-  ctx.drawImage(img, 0, 0);
-  const firstPass = scanAll(ctx, canvas.width, canvas.height, dpr);
+  scanCtx.drawImage(img, 0, 0, scanWidth, scanHeight);
+  const firstPass = scanAll(scanCtx, scanWidth, scanHeight, dpr);
   if (firstPass.length > 0) return firstPass;
 
   // Pass 2: redraw original and apply adaptive thresholding before scanning.
   // Handles QR codes in photos where the modules are not pure black/white
   // (e.g. photos of printed flyers, screenshots of images with noise).
-  ctx.drawImage(img, 0, 0);
-  const thresholded = adaptiveThreshold(ctx.getImageData(0, 0, canvas.width, canvas.height));
-  ctx.putImageData(thresholded, 0, 0);
-  return scanAll(ctx, canvas.width, canvas.height, dpr);
+  scanCtx.drawImage(img, 0, 0, scanWidth, scanHeight);
+  const thresholded = adaptiveThreshold(scanCtx.getImageData(0, 0, scanWidth, scanHeight));
+  scanCtx.putImageData(thresholded, 0, 0);
+  return scanAll(scanCtx, scanWidth, scanHeight, dpr);
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

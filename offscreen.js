@@ -1,3 +1,6 @@
+const BLOCK_SIZE_DENOMINATOR = 48;
+const ADAPTIVE_THRESHOLD_SENSITIVITY = 0.88;
+
 function extractResult(code, dpr) {
   return {
     data: code.data,
@@ -54,7 +57,7 @@ function adaptiveThreshold(imageData) {
 
   // Block half-size: large enough to span several QR modules so local average
   // captures both black and white regions, giving a meaningful local threshold.
-  const half = Math.max(16, Math.floor(Math.min(width, height) / 48));
+  const half = Math.max(16, Math.floor(Math.min(width, height) / BLOCK_SIZE_DENOMINATOR));
 
   const out = new Uint8ClampedArray(width * height * 4);
   for (let y = 0; y < height; y++) {
@@ -68,7 +71,7 @@ function adaptiveThreshold(imageData) {
         integral[(y2 + 1) * W + x1] +
         integral[y1 * W + x1];
       // A pixel is "black" when it is meaningfully darker than its local average.
-      const val = gray[y * width + x] < (sum / count) * 0.88 ? 0 : 255;
+      const val = gray[y * width + x] < (sum / count) * ADAPTIVE_THRESHOLD_SENSITIVITY ? 0 : 255;
       const i = (y * width + x) * 4;
       out[i] = out[i + 1] = out[i + 2] = val;
       out[i + 3] = 255;

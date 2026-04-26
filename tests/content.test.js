@@ -84,7 +84,7 @@ describe('createOverlay — show-more', () => {
     expect(el.querySelector('.qrls-toggle-btn').textContent).toBe('Show more');
   });
 
-  test('truncated span shows first 34 chars followed by ellipsis character', () => {
+  test('truncated span shows first 35 chars followed by ellipsis character', () => {
     const el = createOverlay({ data: longText, topLeftX: 0, topLeftY: 0, devicePixelRatio: 1 });
     expect(el.querySelector('.qrls-text-truncated').textContent).toBe(longText.slice(0, 35) + '…');
   });

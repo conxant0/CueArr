@@ -133,6 +133,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
+if (typeof module === 'undefined') {
+  chrome.runtime.sendMessage({ type: 'OFFSCREEN_READY' });
+}
+
 if (typeof module !== 'undefined') {
   module.exports = { extractResult, getBoundingBox, adaptiveThreshold, decodeAllQRCodes };
 }

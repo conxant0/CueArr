@@ -3,17 +3,10 @@
   "name": "QR Link Scanner",
   "version": "1.0.0",
   "description": "Detect QR codes on the current tab and inject clickable link overlays.",
-  "permissions": ["activeTab", "offscreen"],
+  "permissions": ["activeTab", "offscreen", "scripting"],
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ],
   "action": {
     "default_title": "Scan for QR codes"
   },

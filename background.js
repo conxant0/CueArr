@@ -87,6 +87,15 @@ async function handleTrigger(tab) {
   }
 }
 
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === 'DEBUG_DUMP') {
+    const { scanWidth, scanHeight, dpr, srcWidth, srcHeight } = message.meta;
+    console.group(`CueArr scan failure (scan ${scanWidth}x${scanHeight}, dpr=${dpr}, src ${srcWidth}x${srcHeight})`);
+    for (const { label, dataUrl } of message.dumps) console.log(label, dataUrl);
+    console.groupEnd();
+  }
+});
+
 chrome.action.onClicked.addListener((tab) => {
   handleTrigger(tab).catch(console.error);
 });

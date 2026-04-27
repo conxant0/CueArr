@@ -1,6 +1,7 @@
 const BLOCK_SIZE_DENOMINATOR = 48;
 const ADAPTIVE_THRESHOLD_SENSITIVITY = 0.88;
 const DOWNSAMPLE_PIXEL_THRESHOLD = 2_000_000;
+const DEBUG_DUMP = false;
 
 function extractResult(code, dpr) {
   return {
@@ -125,8 +126,33 @@ async function decodeAllQRCodes(imageDataUrl) {
     scanHeight = secondary.height;
   }
 
-  // Pass 1: try jsQR on the original screenshot.
+  const debugDumps = [];
+
+  // Draw fresh screenshot into scan canvas. Shared input for Pass 0 and Pass 1.
   scanCtx.drawImage(img, 0, 0, scanWidth, scanHeight);
+  if (DEBUG_DUMP) debugDumps.push({ label: 'pass0/1-input', dataUrl: scanCtx.canvas.toDataURL('image/png') });
+
+  // Pass 0: native BarcodeDetector. Typically more tolerant of anti-aliased /
+  // sub-pixel-rendered modules (e.g. PDF viewer at low zoom) than jsQR.
+  // Falls through if the API is unsupported or finds nothing.
+  if ('BarcodeDetector' in window) {
+    try {
+      const detector = new BarcodeDetector({ formats: ['qr_code'] });
+      const codes = await detector.detect(scanCtx.canvas);
+      if (codes.length > 0) {
+        return codes.map(c => ({
+          data: c.rawValue,
+          topLeftX: c.cornerPoints[0].x,
+          topLeftY: c.cornerPoints[0].y,
+          devicePixelRatio: dpr
+        }));
+      }
+    } catch {
+      // Swallow and fall through to the jsQR passes.
+    }
+  }
+
+  // Pass 1: jsQR on the same raw screenshot.
   const firstPass = scanAll(scanCtx, scanWidth, scanHeight, dpr);
   if (firstPass.length > 0) return firstPass;
 
@@ -136,7 +162,36 @@ async function decodeAllQRCodes(imageDataUrl) {
   scanCtx.drawImage(img, 0, 0, scanWidth, scanHeight);
   const thresholded = adaptiveThreshold(scanCtx.getImageData(0, 0, scanWidth, scanHeight));
   scanCtx.putImageData(thresholded, 0, 0);
-  return scanAll(scanCtx, scanWidth, scanHeight, dpr);
+  if (DEBUG_DUMP) debugDumps.push({ label: 'pass2-input', dataUrl: scanCtx.canvas.toDataURL('image/png') });
+  const secondPass = scanAll(scanCtx, scanWidth, scanHeight, dpr);
+  if (secondPass.length > 0) return secondPass;
+
+  // Pass 3: 2× nearest-neighbor upscale of the binarized image from pass 2.
+  // Binarized pixels upscale without blur, giving jsQR more pixels per module
+  // to detect QR codes that are too small at lower zoom levels (e.g. PDFs at 67%).
+  // Skipped on large scan images where a 2× upscale would exceed memory/time budget.
+  if (scanWidth * scanHeight <= DOWNSAMPLE_PIXEL_THRESHOLD) {
+    const upCanvas = document.createElement('canvas');
+    upCanvas.width = scanWidth * 2;
+    upCanvas.height = scanHeight * 2;
+    const upCtx = upCanvas.getContext('2d', { willReadFrequently: true });
+    upCtx.imageSmoothingEnabled = false;
+    upCtx.drawImage(scanCtx.canvas, 0, 0, upCanvas.width, upCanvas.height);
+    if (DEBUG_DUMP) debugDumps.push({ label: 'pass3-input', dataUrl: upCanvas.toDataURL('image/png') });
+    const thirdPass = scanAll(upCtx, upCanvas.width, upCanvas.height, dpr);
+    if (thirdPass.length > 0) {
+      return thirdPass.map(r => ({ ...r, topLeftX: r.topLeftX / 2, topLeftY: r.topLeftY / 2 }));
+    }
+  }
+
+  if (DEBUG_DUMP) {
+    chrome.runtime.sendMessage({
+      type: 'DEBUG_DUMP',
+      meta: { scanWidth, scanHeight, dpr, srcWidth: canvas.width, srcHeight: canvas.height },
+      dumps: debugDumps
+    }).catch(() => {});
+  }
+  return [];
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

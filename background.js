@@ -30,19 +30,24 @@ function waitForOffscreenReady() {
   });
 }
 
+let _offscreenCreating = null;
+
 async function ensureOffscreenDocument() {
   const contexts = await chrome.runtime.getContexts({
     contextTypes: ['OFFSCREEN_DOCUMENT']
   });
-  if (contexts.length === 0) {
-    const readyPromise = waitForOffscreenReady();
-    await chrome.offscreen.createDocument({
-      url: chrome.runtime.getURL('offscreen.html'),
-      reasons: ['DOM_SCRAPING'],
-      justification: 'Decode QR codes from screenshot using jsQR and canvas'
-    });
-    await readyPromise;
+  if (contexts.length > 0) return;
+  if (_offscreenCreating) {
+    await _offscreenCreating;
+    return;
   }
+  const readyPromise = waitForOffscreenReady();
+  _offscreenCreating = chrome.offscreen.createDocument({
+    url: chrome.runtime.getURL('offscreen.html'),
+    reasons: ['DOM_SCRAPING'],
+    justification: 'Decode QR codes from screenshot using jsQR and canvas'
+  }).then(() => readyPromise).finally(() => { _offscreenCreating = null; });
+  await _offscreenCreating;
 }
 
 async function handleTrigger(tab) {
@@ -61,7 +66,7 @@ async function handleTrigger(tab) {
   try {
     imageDataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
   } catch {
-    chrome.tabs.sendMessage(tab.id, { type: 'SHOW_RESULTS', results: [] });
+    chrome.tabs.sendMessage(tab.id, { type: 'SHOW_RESULTS', results: [] }).catch(() => {});
     return;
   }
 
@@ -71,7 +76,7 @@ async function handleTrigger(tab) {
     results = await chrome.runtime.sendMessage({ type: 'DECODE_QR', imageDataUrl });
   } catch (err) {
     console.error('Failed to decode QR via offscreen document:', err);
-    chrome.tabs.sendMessage(tab.id, { type: 'SHOW_RESULTS', results: [] });
+    chrome.tabs.sendMessage(tab.id, { type: 'SHOW_RESULTS', results: [] }).catch(() => {});
     return;
   }
 
@@ -84,4 +89,10 @@ async function handleTrigger(tab) {
 
 chrome.action.onClicked.addListener((tab) => {
   handleTrigger(tab).catch(console.error);
+});
+
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') });
+  }
 });

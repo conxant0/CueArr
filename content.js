@@ -8,8 +8,14 @@ function isUrl(str) {
 }
 
 function createOverlay(result, onClose = () => {}) {
-  const cssX = result.topLeftX / result.devicePixelRatio;
-  const cssY = result.topLeftY / result.devicePixelRatio;
+  const dpr = result.devicePixelRatio || 1;
+  const rawX = result.topLeftX;
+  const rawY = result.topLeftY;
+  // Downsampled screenshots already return CSS-pixel coordinates; only divide
+  // when the raw values exceed the viewport (i.e. they are in physical pixels).
+  const inCssSpace = rawX <= window.innerWidth && rawY <= window.innerHeight;
+  const cssX = inCssSpace ? rawX : rawX / dpr;
+  const cssY = inCssSpace ? rawY : rawY / dpr;
 
   const div = document.createElement('div');
   div.className = 'qrls-overlay';
@@ -129,6 +135,7 @@ function createOverlay(result, onClose = () => {}) {
   }
 
   const attribution = document.createElement('div');
+  attribution.className = 'qrls-attribution';
   attribution.textContent = ATTRIBUTION_LABEL;
   attribution.style.cssText = 'font-size:10px;color:#aaa;text-align:right;margin-top:4px;';
   div.appendChild(attribution);
